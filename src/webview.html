@@ -662,6 +662,70 @@
             background-color: hsl(222.2 84% 4.9% / 0.9);
         }
         
+        /* Representation Controls */
+        .representation-controls {
+            margin: 15px 0;
+            padding: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .representation-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .representation-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: hsl(220, 9%, 46%);
+            padding: 4px 0;
+        }
+        
+        .representation-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+        
+        .representation-slider {
+            position: relative;
+            width: 44px;
+            height: 22px;
+            background-color: #ccc;
+            border-radius: 22px;
+            transition: .4s;
+        }
+        
+        .representation-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: .4s;
+        }
+        
+        .representation-toggle input:checked + .representation-slider {
+            background-color: hsl(220, 9%, 46%);
+        }
+        
+        .representation-toggle input:checked + .representation-slider:before {
+            transform: translateX(22px);
+        }
+        
+        .representation-label {
+            font-weight: 500;
+            user-select: none;
+        }
+        
         /* Color Controls */
         .color-controls {
             margin: 15px 0;
@@ -1390,6 +1454,23 @@
                 <div class="layout-buttons">
                     <button id="single-view" class="active">Single</button>
                     <button id="grid-view">Grid</button>
+                </div>
+            </div>
+            
+            <!-- Representation Controls -->
+            <div class="representation-controls">
+                <h3>Representation</h3>
+                <div class="representation-buttons">
+                    <label class="representation-toggle">
+                        <input type="checkbox" id="ribbon-toggle" checked>
+                        <span class="representation-slider"></span>
+                        <span class="representation-label">Ribbon</span>
+                    </label>
+                    <label class="representation-toggle">
+                        <input type="checkbox" id="atom-toggle">
+                        <span class="representation-slider"></span>
+                        <span class="representation-label">Atoms</span>
+                    </label>
                 </div>
             </div>
             
@@ -2236,6 +2317,17 @@
         let currentRainbowPalette = 'rainbow'; // Current rainbow palette selection
         let illustrativeStyleEnabled = false; // Illustrative style toggle
         let currentModels = []; // Store current 3DMol models
+        
+        // Representation control variables
+        let ribbonRepresentationEnabled = true; // Ribbon representation state
+        let atomRepresentationEnabled = false; // Atom representation state
+        
+        // Representation constants
+        const ATOM_REPRESENTATION_PARAMS = {
+            sizeFactor: 0.3,
+            bondScale: 0.4
+        };
+        
         let currentLayoutMode = 'single'; // 'single' or 'grid'
         let gridViewers = []; // Store grid viewers
         let expandedGridItem = null; // Track expanded grid item
@@ -2458,6 +2550,10 @@
             // Layout mode controls
             document.getElementById('single-view').addEventListener('click', () => setLayoutMode('single'));
             document.getElementById('grid-view').addEventListener('click', () => setLayoutMode('grid'));
+            
+            // Representation controls
+            document.getElementById('ribbon-toggle').addEventListener('change', toggleRibbonRepresentation);
+            document.getElementById('atom-toggle').addEventListener('change', toggleAtomRepresentation);
             
             // Cartoon controls removed per requirements
             
@@ -3009,11 +3105,14 @@
                     console.log(`Loading file with format: ${detectedFormat} -> Molstar format: ${molstarFormat}`);
                     const trajectory = await plugin.builders.structure.parseTrajectory(data, molstarFormat);
                     
-                    // Apply default preset
-                    await plugin.builders.structure.hierarchy.applyPreset(trajectory, 'default');
+                    // Apply structure hierarchy with default preset first
+                    const structure = await plugin.builders.structure.hierarchy.applyPreset(trajectory, 'default');
                     
                     // Store structure reference (for tracking)
                     currentModels = ['loaded'];
+                    
+                    // Apply our custom representation system (this will override the default)
+                    await updateRepresentations();
                     
                     // Set default color mode based on format
                     if (['xyz', 'sdf', 'mol', 'mol2'].includes(format)) {
@@ -3182,6 +3281,138 @@
         // Cartoon control update functions removed per requirements
         
         // View mode management removed - cartoon only mode
+        
+        // Representation control functions
+        async function toggleRibbonRepresentation() {
+            const ribbonToggle = document.getElementById('ribbon-toggle');
+            ribbonRepresentationEnabled = ribbonToggle.checked;
+            console.log('Ribbon representation:', ribbonRepresentationEnabled);
+            await updateRepresentations();
+        }
+        
+        async function toggleAtomRepresentation() {
+            const atomToggle = document.getElementById('atom-toggle');
+            atomRepresentationEnabled = atomToggle.checked;
+            console.log('Atom representation:', atomRepresentationEnabled);
+            await updateRepresentations();
+        }
+        
+        /**
+         * Creates an array of representation configurations based on current toggle states
+         * @returns {Array} Array of representation objects with type, typeParams, color, and colorParams
+         */
+        function createRepresentations() {
+            const representations = [];
+            
+            if (ribbonRepresentationEnabled) {
+                representations.push({
+                    type: 'cartoon',
+                    typeParams: {},
+                    color: getColorThemeName(),
+                    colorParams: getColorThemeParams()
+                });
+            }
+            
+            if (atomRepresentationEnabled) {
+                representations.push({
+                    type: 'ball-and-stick',
+                    typeParams: ATOM_REPRESENTATION_PARAMS,
+                    color: getColorThemeName(),
+                    colorParams: getColorThemeParams()
+                });
+            }
+            
+            return representations;
+        }
+        
+        /**
+         * Applies representations to a structure by clearing existing components and adding new ones
+         * @param {Object} plugin - Molstar plugin instance
+         * @param {Object} structure - Structure object with components to update
+         */
+        async function applyRepresentationsToStructure(plugin, structure) {
+            if (structure.components) {
+                // Clear existing components first
+                await plugin.managers.structure.component.clear(structure.components);
+            }
+            
+            // Get representations to apply
+            const representations = createRepresentations();
+            
+            // Apply each representation
+            for (const repr of representations) {
+                await plugin.builders.structure.representation.addRepresentation(
+                    structure.cell, 
+                    repr
+                );
+            }
+        }
+        
+        async function updateRepresentations() {
+            if (!viewer || !viewer.plugin) return;
+            
+            try {
+                // Get current structures
+                const structures = viewer.plugin.managers.structure.hierarchy.current.structures;
+                
+                if (!structures || structures.length === 0) {
+                    console.log('No structures to update representations for');
+                    return;
+                }
+                
+                await viewer.plugin.dataTransaction(async () => {
+                    for (const structure of structures) {
+                        await applyRepresentationsToStructure(viewer.plugin, structure);
+                    }
+                });
+                
+                // Update grid viewers if in grid mode
+                if (currentLayoutMode === 'grid') {
+                    await updateAllGridViewersRepresentations();
+                }
+                
+                // Update dual session viewers if active
+                if (currentSessionMode === 'dual') {
+                    if (leftViewer) await updateViewerRepresentations(leftViewer);
+                    if (rightViewer) await updateViewerRepresentations(rightViewer);
+                }
+                
+                console.log('Representations updated successfully');
+                
+            } catch (error) {
+                console.error('Error updating representations:', error);
+            }
+        }
+        
+        async function updateViewerRepresentations(targetViewer) {
+            if (!targetViewer || !targetViewer.plugin) return;
+            
+            try {
+                const structures = targetViewer.plugin.managers.structure.hierarchy.current.structures;
+                
+                if (!structures || structures.length === 0) return;
+                
+                await targetViewer.plugin.dataTransaction(async () => {
+                    for (const structure of structures) {
+                        await applyRepresentationsToStructure(targetViewer.plugin, structure);
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating viewer representations:', error);
+            }
+        }
+        
+        async function updateAllGridViewersRepresentations() {
+            for (let i = 0; i < gridViewers.length; i++) {
+                if (gridViewers[i] && activeGridViewers.has(i)) {
+                    try {
+                        await updateViewerRepresentations(gridViewers[i]);
+                    } catch (error) {
+                        console.error(`Error updating grid viewer ${i} representations:`, error);
+                    }
+                }
+            }
+        }
         
         // Layout mode management
         async function setLayoutMode(mode) {
@@ -3943,8 +4174,11 @@
                     console.log(`Loading grid file: ${file.name} with format: ${file.format} -> Molstar format: ${molstarFormat}`);
                     const trajectory = await plugin.builders.structure.parseTrajectory(data, molstarFormat);
                     
-                    // Apply default preset
-                    await plugin.builders.structure.hierarchy.applyPreset(trajectory, 'default');
+                    // Apply structure hierarchy with default preset first
+                    const structure = await plugin.builders.structure.hierarchy.applyPreset(trajectory, 'default');
+                    
+                    // Apply our custom representation system (this will override the default)
+                    await updateViewerRepresentations(gridViewer);
                     
                     // Set default color mode based on format for grid viewers
                     if (['xyz', 'sdf', 'mol', 'mol2'].includes(file.format)) {
@@ -5131,7 +5365,8 @@
                 const structure1 = await leftViewer.plugin.builders.structure.hierarchy.applyPreset(trajectory1, 'default');
                 URL.revokeObjectURL(url1);
                 
-                // Apply current color theme to original structure
+                // Apply our custom representation system and current color theme to original structure
+                await updateViewerRepresentations(leftViewer);
                 await applyColorThemeToViewer(leftViewer);
                 
                 // Load predicted structure in right viewer
@@ -5142,7 +5377,8 @@
                 const structure2 = await rightViewer.plugin.builders.structure.hierarchy.applyPreset(trajectory2, 'default');
                 URL.revokeObjectURL(url2);
                 
-                // Apply pLDDT coloring to predicted structure
+                // Apply our custom representation system and pLDDT coloring to predicted structure
+                await updateViewerRepresentations(rightViewer);
                 await applyPLDDTColoringToViewer(rightViewer);
                 
                 console.log('Dual session structures loaded successfully');
@@ -5279,6 +5515,9 @@
                     console.log('Added predicted structure to tracking:', structure.cell.transform.ref);
                 }
                 
+                // Apply our custom representation system
+                await updateRepresentations();
+                
                 // Apply pLDDT coloring specifically to this structure
                 await applyPLDDTColoringToStructure(structure);
                 
@@ -5310,9 +5549,6 @@
                     console.log('Added predicted structure to alignment tracking:', structure1.cell.transform.ref);
                 }
                 
-                // Apply pLDDT coloring to predicted structure
-                await applyPLDDTColoringToStructure(structure1);
-                
                 // Load matched structure (this will get regular coloring)
                 const blob2 = new Blob([matchedFile.data], { type: 'text/plain' });
                 const url2 = URL.createObjectURL(blob2);
@@ -5321,15 +5557,11 @@
                 const structure2 = await viewer.plugin.builders.structure.hierarchy.applyPreset(trajectory2, 'default');
                 URL.revokeObjectURL(url2);
                 
-                // Apply current color scheme to the non-predicted structure
-                if (structure2 && structure2.components) {
-                    await viewer.plugin.dataTransaction(async () => {
-                        await viewer.plugin.managers.structure.component.updateRepresentationsTheme(
-                            structure2.components, 
-                            { color: getColorThemeName(), params: getColorThemeParams() }
-                        );
-                    });
-                }
+                // Apply our custom representation system
+                await updateRepresentations();
+                
+                // Apply pLDDT coloring to predicted structure
+                await applyPLDDTColoringToStructure(structure1);
                 
                 // Start monitoring for RMSD values
                 startRMSDMonitoring(sequence);
