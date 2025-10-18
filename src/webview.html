@@ -2322,6 +2322,12 @@
         let ribbonRepresentationEnabled = true; // Ribbon representation state
         let atomRepresentationEnabled = false; // Atom representation state
         
+        // Representation constants
+        const ATOM_REPRESENTATION_PARAMS = {
+            sizeFactor: 0.3,
+            bondScale: 0.4
+        };
+        
         let currentLayoutMode = 'single'; // 'single' or 'grid'
         let gridViewers = []; // Store grid viewers
         let expandedGridItem = null; // Track expanded grid item
@@ -3291,6 +3297,50 @@
             await updateRepresentations();
         }
         
+        // Helper function to create representations based on current settings
+        function createRepresentations() {
+            const representations = [];
+            
+            if (ribbonRepresentationEnabled) {
+                representations.push({
+                    type: 'cartoon',
+                    typeParams: {},
+                    color: getColorThemeName(),
+                    colorParams: getColorThemeParams()
+                });
+            }
+            
+            if (atomRepresentationEnabled) {
+                representations.push({
+                    type: 'ball-and-stick',
+                    typeParams: ATOM_REPRESENTATION_PARAMS,
+                    color: getColorThemeName(),
+                    colorParams: getColorThemeParams()
+                });
+            }
+            
+            return representations;
+        }
+        
+        // Helper function to apply representations to a structure
+        async function applyRepresentationsToStructure(plugin, structure) {
+            if (structure.components) {
+                // Clear existing components first
+                await plugin.managers.structure.component.clear(structure.components);
+            }
+            
+            // Get representations to apply
+            const representations = createRepresentations();
+            
+            // Apply each representation
+            for (const repr of representations) {
+                await plugin.builders.structure.representation.addRepresentation(
+                    structure.cell, 
+                    repr
+                );
+            }
+        }
+        
         async function updateRepresentations() {
             if (!viewer || !viewer.plugin) return;
             
@@ -3305,39 +3355,7 @@
                 
                 await viewer.plugin.dataTransaction(async () => {
                     for (const structure of structures) {
-                        if (structure.components) {
-                            // Clear existing components first
-                            await viewer.plugin.managers.structure.component.clear(structure.components);
-                        }
-                        
-                        // Add polymer representation (main chain) if ribbon is enabled
-                        if (ribbonRepresentationEnabled) {
-                            await viewer.plugin.builders.structure.representation.addRepresentation(
-                                structure.cell, 
-                                {
-                                    type: 'cartoon',
-                                    typeParams: {},
-                                    color: getColorThemeName(),
-                                    colorParams: getColorThemeParams()
-                                }
-                            );
-                        }
-                        
-                        // Add atom representation if enabled
-                        if (atomRepresentationEnabled) {
-                            await viewer.plugin.builders.structure.representation.addRepresentation(
-                                structure.cell, 
-                                {
-                                    type: 'ball-and-stick',
-                                    typeParams: { 
-                                        sizeFactor: 0.3,
-                                        bondScale: 0.4
-                                    },
-                                    color: getColorThemeName(),
-                                    colorParams: getColorThemeParams()
-                                }
-                            );
-                        }
+                        await applyRepresentationsToStructure(viewer.plugin, structure);
                     }
                 });
                 
@@ -3369,39 +3387,7 @@
                 
                 await targetViewer.plugin.dataTransaction(async () => {
                     for (const structure of structures) {
-                        if (structure.components) {
-                            // Clear existing components first
-                            await targetViewer.plugin.managers.structure.component.clear(structure.components);
-                        }
-                        
-                        // Add polymer representation (main chain) if ribbon is enabled
-                        if (ribbonRepresentationEnabled) {
-                            await targetViewer.plugin.builders.structure.representation.addRepresentation(
-                                structure.cell, 
-                                {
-                                    type: 'cartoon',
-                                    typeParams: {},
-                                    color: getColorThemeName(),
-                                    colorParams: getColorThemeParams()
-                                }
-                            );
-                        }
-                        
-                        // Add atom representation if enabled
-                        if (atomRepresentationEnabled) {
-                            await targetViewer.plugin.builders.structure.representation.addRepresentation(
-                                structure.cell, 
-                                {
-                                    type: 'ball-and-stick',
-                                    typeParams: { 
-                                        sizeFactor: 0.3,
-                                        bondScale: 0.4
-                                    },
-                                    color: getColorThemeName(),
-                                    colorParams: getColorThemeParams()
-                                }
-                            );
-                        }
+                        await applyRepresentationsToStructure(targetViewer.plugin, structure);
                     }
                 });
             } catch (error) {
