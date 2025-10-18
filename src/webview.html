@@ -3297,7 +3297,10 @@
             await updateRepresentations();
         }
         
-        // Helper function to create representations based on current settings
+        /**
+         * Creates an array of representation configurations based on current toggle states
+         * @returns {Array} Array of representation objects with type, typeParams, color, and colorParams
+         */
         function createRepresentations() {
             const representations = [];
             
@@ -3322,7 +3325,11 @@
             return representations;
         }
         
-        // Helper function to apply representations to a structure
+        /**
+         * Applies representations to a structure by clearing existing components and adding new ones
+         * @param {Object} plugin - Molstar plugin instance
+         * @param {Object} structure - Structure object with components to update
+         */
         async function applyRepresentationsToStructure(plugin, structure) {
             if (structure.components) {
                 // Clear existing components first
