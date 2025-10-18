@@ -809,7 +809,60 @@
             color: hsl(210 40% 98%);
         }
 
-        /* Illustrative Style Switch */
+        /* Style Options Radio Group */
+        .style-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .style-option-label {
+            font-size: 11px;
+            color: hsl(220, 9%, 46%);
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .style-radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .style-radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 11px;
+            color: hsl(220, 9%, 46%);
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .style-radio-option:hover {
+            background-color: hsl(210, 40%, 98%);
+        }
+
+        .style-radio-option input[type="radio"] {
+            margin: 0;
+            width: 14px;
+            height: 14px;
+            accent-color: hsl(220, 9%, 46%);
+        }
+
+        .style-radio-label {
+            flex: 1;
+            user-select: none;
+        }
+
+        .style-radio-option input[type="radio"]:checked + .style-radio-label {
+            font-weight: 600;
+            color: hsl(220, 9%, 30%);
+        }
+
+        /* Legacy Illustrative Style Switch - keeping for backwards compatibility */
         .illustrative-style-switch {
             display: flex;
             align-items: center;
@@ -1425,12 +1478,28 @@
                             </div>
                         </div>
 
-                        <!-- Illustrative Style Switch -->
-                        <label class="illustrative-style-switch" title="Toggle Illustrative Style">
-                            <input type="checkbox" id="illustrative-style-toggle">
-                            <span class="illustrative-style-slider"></span>
-                            <span class="illustrative-style-label">Illustrative</span>
-                        </label>
+                        <!-- Style Options -->
+                        <div class="style-options">
+                            <label class="style-option-label">Style:</label>
+                            <div class="style-radio-group">
+                                <label class="style-radio-option">
+                                    <input type="radio" name="style-option" value="default" id="style-default" checked>
+                                    <span class="style-radio-label">Default</span>
+                                </label>
+                                <label class="style-radio-option">
+                                    <input type="radio" name="style-option" value="illustrative" id="style-illustrative">
+                                    <span class="style-radio-label">Illustrative</span>
+                                </label>
+                                <label class="style-radio-option">
+                                    <input type="radio" name="style-option" value="glossy" id="style-glossy">
+                                    <span class="style-radio-label">Glossy</span>
+                                </label>
+                                <label class="style-radio-option">
+                                    <input type="radio" name="style-option" value="matte" id="style-matte">
+                                    <span class="style-radio-label">Matte</span>
+                                </label>
+                            </div>
+                        </div>
                 </div>
 
                 <!-- Custom Color Palette -->
@@ -2234,7 +2303,7 @@
         let currentColorMode = 'custom'; // 'custom', 'element', 'residue', 'chain', 'rainbow'
         let currentCustomColor = '#4ECDC4'; // Default teal color
         let currentRainbowPalette = 'rainbow'; // Current rainbow palette selection
-        let illustrativeStyleEnabled = false; // Illustrative style toggle
+        let currentStyleMode = 'default'; // Current style mode: 'default', 'illustrative', 'glossy', 'matte'
         let currentModels = []; // Store current 3DMol models
         let currentLayoutMode = 'single'; // 'single' or 'grid'
         let gridViewers = []; // Store grid viewers
@@ -2515,10 +2584,14 @@
                 });
             });
 
-            // Illustrative style toggle
-            document.getElementById('illustrative-style-toggle').addEventListener('change', async (e) => {
-                illustrativeStyleEnabled = e.target.checked;
-                await applyIllustrativeStyle(illustrativeStyleEnabled);
+            // Style option radio buttons
+            document.querySelectorAll('input[name="style-option"]').forEach(radio => {
+                radio.addEventListener('change', async (e) => {
+                    if (e.target.checked) {
+                        currentStyleMode = e.target.value;
+                        await applyStyleMode(currentStyleMode);
+                    }
+                });
             });
 
             // Color palette
@@ -3358,100 +3431,66 @@
             }
         }
 
-        // Illustrative style management
-        async function applyIllustrativeStyle(enabled) {
+        // Style mode management - enhanced system
+        async function applyStyleMode(mode) {
             if (!viewer || !viewer.plugin) return;
 
             try {
-                const plugin = viewer.plugin;
+                console.log(`Applying style mode: ${mode}`);
+                
+                // Apply to main viewer
+                await applyStyleModeToViewer(viewer, mode);
 
-                // Set ignoreLight option for all structures
-                await plugin.managers.structure.component.setOptions({
-                    ...plugin.managers.structure.component.state.options,
-                    ignoreLight: enabled
-                });
-
-                // Apply canvas3d postprocessing effects
-                if (plugin.canvas3d) {
-                    if (enabled) {
-                        // Apply illustrative style with outline and occlusion
-                        const pp = plugin.canvas3d.props.postprocessing;
-                        plugin.canvas3d.setProps({
-                            postprocessing: {
-                                outline: {
-                                    name: 'on',
-                                    params: pp.outline.name === 'on' ? pp.outline.params : {
-                                        scale: 1,
-                                        threshold: 0.33,
-                                        includeTransparent: true
-                                    }
-                                },
-                                occlusion: {
-                                    name: 'on',
-                                    params: pp.occlusion.name === 'on' ? pp.occlusion.params : {
-                                        multiScale: { name: 'off', params: {} },
-                                        radius: 5,
-                                        bias: 0.8,
-                                        blurKernelSize: 15,
-                                        samples: 32,
-                                        resolutionScale: 1
-                                    }
-                                },
-                                shadow: { name: 'off', params: {} }
-                            }
-                        });
-                    } else {
-                        // Reset to default style
-                        plugin.canvas3d.setProps({
-                            postprocessing: {
-                                outline: { name: 'off', params: {} },
-                                occlusion: { name: 'off', params: {} },
-                                shadow: { name: 'off', params: {} }
-                            }
-                        });
-                    }
-                }
-
-                // Also apply to dual session viewers if active
+                // Apply to dual session viewers if active
                 if (currentSessionMode === 'dual') {
-                    if (leftViewer) await applyIllustrativeStyleToViewer(leftViewer, enabled);
-                    if (rightViewer) await applyIllustrativeStyleToViewer(rightViewer, enabled);
+                    if (leftViewer) await applyStyleModeToViewer(leftViewer, mode);
+                    if (rightViewer) await applyStyleModeToViewer(rightViewer, mode);
                 }
 
                 // Apply to all grid viewers
                 if (currentLayoutMode === 'grid') {
                     for (let i = 0; i < gridViewers.length; i++) {
                         if (gridViewers[i] && activeGridViewers.has(i)) {
-                            await applyIllustrativeStyleToViewer(gridViewers[i], enabled);
+                            await applyStyleModeToViewer(gridViewers[i], mode);
                         }
                     }
                 }
 
-                console.log(`Illustrative style ${enabled ? 'enabled' : 'disabled'}`);
+                console.log(`Style mode ${mode} applied successfully`);
             } catch (error) {
-                console.error('Error applying illustrative style:', error);
+                console.error('Error applying style mode:', error);
             }
         }
 
-        async function applyIllustrativeStyleToViewer(targetViewer, enabled) {
+        async function applyStyleModeToViewer(targetViewer, mode) {
             if (!targetViewer || !targetViewer.plugin) return;
 
             try {
                 const plugin = targetViewer.plugin;
 
-                // Set ignoreLight option for all structures
+                // Set ignoreLight based on mode
+                const ignoreLight = mode !== 'default';
                 await plugin.managers.structure.component.setOptions({
                     ...plugin.managers.structure.component.state.options,
-                    ignoreLight: enabled
+                    ignoreLight: ignoreLight
                 });
 
-                // Apply canvas3d postprocessing effects
+                // Apply canvas3d postprocessing effects based on mode
                 if (plugin.canvas3d) {
-                    if (enabled) {
-                        // Apply illustrative style with outline and occlusion
-                        const pp = plugin.canvas3d.props.postprocessing;
-                        plugin.canvas3d.setProps({
-                            postprocessing: {
+                    let postprocessingConfig = {};
+
+                    switch (mode) {
+                        case 'default':
+                            postprocessingConfig = {
+                                outline: { name: 'off', params: {} },
+                                occlusion: { name: 'off', params: {} },
+                                shadow: { name: 'off', params: {} }
+                            };
+                            break;
+
+                        case 'illustrative':
+                            const pp = plugin.canvas3d.props.postprocessing;
+                            postprocessingConfig = {
                                 outline: {
                                     name: 'on',
                                     params: pp.outline.name === 'on' ? pp.outline.params : {
@@ -3472,22 +3511,78 @@
                                     }
                                 },
                                 shadow: { name: 'off', params: {} }
-                            }
-                        });
-                    } else {
-                        // Reset to default style
-                        plugin.canvas3d.setProps({
-                            postprocessing: {
+                            };
+                            break;
+
+                        case 'glossy':
+                            postprocessingConfig = {
+                                outline: { name: 'off', params: {} },
+                                occlusion: {
+                                    name: 'on',
+                                    params: {
+                                        multiScale: { name: 'off', params: {} },
+                                        radius: 3,
+                                        bias: 0.5,
+                                        blurKernelSize: 8,
+                                        samples: 16,
+                                        resolutionScale: 1.2
+                                    }
+                                },
+                                shadow: {
+                                    name: 'on',
+                                    params: {
+                                        bias: 0.6,
+                                        maxDistance: 256,
+                                        steps: 8,
+                                        tolerance: 1.0
+                                    }
+                                }
+                            };
+                            break;
+
+                        case 'matte':
+                            postprocessingConfig = {
+                                outline: { name: 'off', params: {} },
+                                occlusion: {
+                                    name: 'on',
+                                    params: {
+                                        multiScale: { name: 'off', params: {} },
+                                        radius: 8,
+                                        bias: 1.2,
+                                        blurKernelSize: 25,
+                                        samples: 64,
+                                        resolutionScale: 0.8
+                                    }
+                                },
+                                shadow: { name: 'off', params: {} }
+                            };
+                            break;
+
+                        default:
+                            postprocessingConfig = {
                                 outline: { name: 'off', params: {} },
                                 occlusion: { name: 'off', params: {} },
                                 shadow: { name: 'off', params: {} }
-                            }
-                        });
+                            };
                     }
+
+                    plugin.canvas3d.setProps({ postprocessing: postprocessingConfig });
                 }
             } catch (error) {
-                console.error('Error applying illustrative style to viewer:', error);
+                console.error(`Error applying ${mode} style to viewer:`, error);
             }
+        }
+
+        // Legacy function for backwards compatibility
+        async function applyIllustrativeStyle(enabled) {
+            const mode = enabled ? 'illustrative' : 'default';
+            currentStyleMode = mode;
+            
+            // Update radio button to match
+            const radio = document.getElementById(enabled ? 'style-illustrative' : 'style-default');
+            if (radio) radio.checked = true;
+            
+            await applyStyleMode(mode);
         }
 
         // Color mode management
@@ -3688,9 +3783,9 @@
                 // Load structure
                 await loadStructureIntoGridViewer(offscreenViewer, file);
 
-                // Apply current illustrative style if enabled
-                if (illustrativeStyleEnabled) {
-                    await applyIllustrativeStyleToViewer(offscreenViewer, true);
+                // Apply current style mode
+                if (currentStyleMode !== 'default') {
+                    await applyStyleModeToViewer(offscreenViewer, currentStyleMode);
                 }
 
                 // Wait for rendering
@@ -4099,9 +4194,9 @@
                 // Load structure into the viewer
                 await loadStructureIntoGridViewer(gridViewer, loadedFiles[fileIndex]);
 
-                // Apply current illustrative style to the newly created viewer
-                if (illustrativeStyleEnabled) {
-                    await applyIllustrativeStyleToViewer(gridViewer, true);
+                // Apply current style mode to the newly created viewer
+                if (currentStyleMode !== 'default') {
+                    await applyStyleModeToViewer(gridViewer, currentStyleMode);
                 }
 
                 // Add the expand button
@@ -4259,9 +4354,9 @@
                         
                         await parseStructureFile(file.data, file.format, false);
 
-                        // Apply current illustrative style if enabled
-                        if (illustrativeStyleEnabled) {
-                            await applyIllustrativeStyle(true);
+                        // Apply current style mode
+                        if (currentStyleMode !== 'default') {
+                            await applyStyleMode(currentStyleMode);
                         }
 
                         // Force viewer refresh and resize
