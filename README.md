@@ -113,12 +113,28 @@ When loading diffusion sequences:
   - Yellow: Low confidence (50-70)
   - Orange: Very Low confidence (<50)
 
-### Illustrative Style
+### Advanced Rendering Styles
 
-Toggle illustrative rendering for enhanced visual quality:
+Choose from multiple rendering styles for enhanced molecular visualization:
+
+#### Default Style
+- Standard molecular rendering with basic lighting
+- Clean, traditional appearance suitable for most applications
+
+#### Illustrative Style
 - **Outline Effect**: Adds edge outlines to structures for better definition
 - **Ambient Occlusion**: Adds depth perception with shadowing in cavities
 - Creates publication-quality visualizations with improved depth and clarity
+
+#### Glossy Style
+- **High Reflectivity**: Enhanced specular highlights for a polished appearance
+- **Dynamic Shadows**: Advanced shadow rendering for realistic reflective surfaces
+- Ideal for presentations requiring a sophisticated, modern look
+
+#### Matte Style
+- **Diffuse Lighting**: Soft, non-reflective surface appearance
+- **Reduced Specularity**: Minimized shine for a flat, matte finish
+- Perfect for scientific documentation requiring subdued, professional rendering
 
 ## Requirements
 
@@ -205,6 +221,15 @@ If you use this extension in your research, please cite the underlying Mol* fram
 - **VSCode Team**: For the excellent extension API
 
 ## Version History
+
+### 1.0.5 (Upcoming)
+- Added **Enhanced Rendering Styles**
+  - **Glossy Style**: High reflectivity with enhanced shadows for polished appearance
+  - **Matte Style**: Diffuse, non-reflective surface with soft ambient lighting
+  - **Improved Style Selection**: Converted from checkbox to radio button interface
+  - **Legacy Support**: Maintained backwards compatibility with existing illustrative style
+- Enhanced molecular visualization options for professional presentations
+- Improved user interface with better style selection controls
 
 ### 1.0.4
 - Added **Rainbow Coloring Mode** with 6 different color palettes
